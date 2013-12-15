@@ -94,7 +94,8 @@ TranslationQueryset
     
     .. attribute:: _language_code
     
-        The language code of this queryset.
+        The language code of this queryset, or special value AllLanguages if
+        :meth:`all_languages` was called on this queryset.
     
     .. attribute:: translations_manager
     
@@ -184,7 +185,24 @@ TranslationQueryset
         If no language code is given,
         :func:`~django.utils.translation.get_language` is called to get the
         current language.
-        
+
+        Please note that calling both :meth:`language` and :meth:`all_languages`
+        on the same queryset is a mistake.
+
+        Returns a queryset.
+
+    .. method:: all_languages(self)
+
+        Specifies this queryset should return for every instance all languages
+        matching the query. Duplicate instances can be returned if more than one
+        of their translations matches the query. One can use instance.language_code
+        to know which translation matched.
+
+        This sets the :attr:`_language_code` to special value :data:`AllLanguages`.
+
+        Please note that calling both :meth:`language` and :meth:`all_languages`
+        on the same queryset is a mistake.
+
         Returns a queryset.
         
     .. method:: create(self, **kwargs)
@@ -210,7 +228,8 @@ TranslationQueryset
         :class:`~django.db.models.Q` objects given in args. If no
         args were given or they don't contain a language code, it searches the
         :class:`django.db.models.sql.where.WhereNode` objects on the current
-        queryset for language codes. If none was found, it calls
+        queryset for language codes. If none was found and :meth:`all_languages`,
+        was not used on the queryset, it calls
         :meth:`language` without an argument, which in turn uses 
         :func:`~django.utils.translation.get_language` to enforce a language to
         be used in this queryset.
@@ -360,6 +379,11 @@ TranslationManager
     
         Instanciates a :class:`TranslationQueryset` from :attr:`queryset_class` and calls
         :meth:`TranslationQueryset.language` on that queryset.
+
+    .. method:: any_languages(self)
+
+        Instanciates a :class:`TranslationQueryset` from :attr:`queryset_class` and calls
+        :meth:`TranslationQueryset.all_languages` on that queryset.
     
     .. method:: untranslated(self)
     

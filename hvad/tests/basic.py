@@ -266,6 +266,42 @@ class GetByLanguageTest(NaniTestCase, TwoTranslatedNormalMixin):
             self.assertEqual(obj.translated_field, DOUBLE_NORMAL[1]['translated_field_ja'])
 
 
+class GetAllLanguagesTest(NaniTestCase, TwoTranslatedNormalMixin):
+    def test_args(self):
+        with LanguageOverride('en'):
+            q = Q(pk=1)
+            with self.assertNumQueries(1):
+                objs = Normal.objects.all_languages().filter(q)
+                self.assertEqual(len(objs), 2)
+                self.assertItemsEqual((1, 1), (objs[0].pk, objs[1].pk))
+                self.assertItemsEqual(('en', 'ja'), (objs[0].language_code, objs[1].language_code))
+
+    def test_kwargs(self):
+        with LanguageOverride('en'):
+            kwargs = {'pk':1}
+            with self.assertNumQueries(1):
+                objs = Normal.objects.all_languages().filter(**kwargs)
+                self.assertEqual(len(objs), 2)
+                self.assertItemsEqual((1, 1), (objs[0].pk, objs[1].pk))
+                self.assertItemsEqual(('en', 'ja'), (objs[0].language_code, objs[1].language_code))
+
+    def test_translated_unique(self):
+        with LanguageOverride('en'):
+            with self.assertNumQueries(1):
+                obj = Normal.objects.all_languages().get(translated_field=DOUBLE_NORMAL[1]['translated_field_ja'])
+                self.assertEqual(obj.pk, 1)
+                self.assertEqual(obj.language_code, 'ja')
+                self.assertEqual(obj.shared_field, DOUBLE_NORMAL[1]['shared_field'])
+                self.assertEqual(obj.translated_field, DOUBLE_NORMAL[1]['translated_field_ja'])
+
+    def test_language_all_languages_raises(self):
+        with LanguageOverride('en'):
+            with self.assertRaises(AssertionError):
+                obj = Normal.objects.language().all_languages().get(pk=1)
+            with self.assertRaises(AssertionError):
+                obj = Normal.objects.all_languages().language().get(pk=1)
+
+
 class BasicQueryTest(NaniTestCase, OneSingleTranslatedNormalMixin):
     def test_basic(self):
         en = Normal.objects.language('en').get(pk=1)

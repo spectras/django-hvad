@@ -7,7 +7,7 @@ try:
     from django.db.models.query import CHUNK_SIZE
 except ImportError:
     CHUNK_SIZE = 100
-from django.db.models.query_utils import Q
+from django.db.models import F, Q
 from django.utils.translation import get_language
 from hvad.fieldtranslator import translate
 from hvad.utils import combine
@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 # maybe there should be an extra settings for this
 FALLBACK_LANGUAGES = [ code for code, name in settings.LANGUAGES ]
+
+class AllLanguages(object): pass
 
 class FieldTranslator(dict):
     """
@@ -254,11 +256,21 @@ class TranslationQueryset(QuerySet):
     #===========================================================================
     
     def language(self, language_code=None):
+        assert self._language_code is not AllLanguages, (
+            'Called both language() and all_languages() on the same queryset.'
+        )
         if not language_code:
             language_code = get_language()
         self._language_code = language_code
         return self.filter(language_code=language_code)
-    
+
+    def all_languages(self):
+        assert self._language_code in (None, AllLanguages), (
+            'Called both language() and all_languages() on the same queryset.'
+        )
+        self._language_code = AllLanguages
+        return self
+
     def __getitem__(self, k):
         """
         Handle getitem special since self.iterator is called *after* the
@@ -310,7 +322,7 @@ class TranslationQueryset(QuerySet):
                 found = True
         else:
             found = self._scan_for_language_where_node(qs.query.where.children)
-        if not found:
+        if not found and self._language_code is not AllLanguages:
             qs = self.language()
         # self.iterator already combines! Isn't that nice?
         return QuerySet.get(qs, *newargs, **newkwargs)
@@ -477,7 +489,7 @@ class TranslationQueryset(QuerySet):
                 related_model_explicit_joins.append(join_data)
                 # And we are going to force the query to treat the language join as one-to-one,
                 # so we need to filter for the desired language:
-                related_model_extra_filters.append(('%s__%s__language_code' % (query_key, model._meta.translations_accessor), self._language_code))
+                related_model_extra_filters.append(('%s__%s__language_code' % (query_key, model._meta.translations_accessor), F('language_code')))
                 rel_field_to_force = getattr(model, model._meta.translations_accessor).related.field
                 if not rel_field_to_force._unique:
                     # The filter that we set up above essentially makes the related translations table
@@ -632,6 +644,9 @@ class TranslationManager(models.Manager):
 
     def language(self, language_code=None):
         return self.using_translations().language(language_code)
+
+    def all_languages(self):
+        return self.using_translations().all_languages()
 
     def untranslated(self):
         if django.VERSION >= (1, 6):
