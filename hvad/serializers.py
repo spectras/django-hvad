@@ -1,19 +1,24 @@
 from rest_framework import serializers
 from collections import OrderedDict
 
-class TranslatableModelSerializerOptions(serializers.ModelSerializerOptions):
+class TranslatableModelOptionsMixin(object):
     def __init__(self, meta):
-        super(TranslatableModelSerializerOptions, self).__init__(meta)
+        super(TranslatableModelOptionsMixin, self).__init__(meta)
         # We need this ugly hack as ModelSerializer hardcodes a read_only_fields check
         self.translated_read_only_fields = getattr(meta, 'translated_read_only_fields', ())
         self.translated_write_only_fields = getattr(meta, 'translated_write_only_fields', ())
 
-class TranslatableModelSerializer(serializers.ModelSerializer):
-    _options_class = TranslatableModelSerializerOptions
+class TranslatableModelSerializerOptions(TranslatableModelOptionsMixin,
+                                         serializers.ModelSerializerOptions):
+    pass
 
+class HyperlinkedTranslatableModelSerializerOptions(TranslatableModelOptionsMixin,
+                                                    serializers.HyperlinkedModelSerializerOptions):
+    pass
+
+class TranslatableModelMixin(object):
     def get_default_fields(self):
-        import pdb;pdb.set_trace()
-        fields = super(TranslatableModelSerializer, self).get_default_fields()
+        fields = super(TranslatableModelMixin, self).get_default_fields()
         fields.update(self._get_translated_fields())
         return fields
 
@@ -64,4 +69,11 @@ class TranslatableModelSerializer(serializers.ModelSerializer):
                 else:
                     setattr(instance, tcache, translation)
 
-        return super(TranslatableModelSerializer, self).restore_object(new_attrs, instance)
+        return super(TranslatableModelMixin, self).restore_object(new_attrs, instance)
+
+class TranslatableModelSerializer(TranslatableModelMixin, serializers.ModelSerializer):
+    _options_class = TranslatableModelSerializerOptions
+
+class HyperlinkedTranslatableModelSerializer(TranslatableModelMixin,
+                                             serializers.HyperlinkedModelSerializer):
+    _options_class = HyperlinkedTranslatableModelSerializerOptions
